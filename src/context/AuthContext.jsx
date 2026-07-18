@@ -1,13 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import { authAPI } from '../services/api';
 
 const AuthContext = createContext();
-
-const API_URL = import.meta.env.VITE_API_URL;
-
-if (!API_URL) {
-  throw new Error('VITE_API_URL is required. Set it to the backend API URL.');
-}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -18,10 +12,8 @@ export const AuthProvider = ({ children }) => {
   // Setup default headers for requests
   useEffect(() => {
     if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       fetchUserProfile();
     } else {
-      delete axios.defaults.headers.common['Authorization'];
       setUser(null);
       setLoading(false);
     }
@@ -30,10 +22,10 @@ export const AuthProvider = ({ children }) => {
   const fetchUserProfile = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/auth/me`);
-      setUser(res.data);
-      localStorage.setItem('role', res.data.role);
-      setRole(res.data.role);
+      const profile = await authAPI.getMe();
+      setUser(profile);
+      localStorage.setItem('role', profile.role);
+      setRole(profile.role);
     } catch (err) {
       console.error('Failed to load profile:', err);
       logout();
@@ -43,15 +35,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (email, password) => {
-    const params = new URLSearchParams();
-    params.append('username', email);
-    params.append('password', password);
-    
-    const res = await axios.post(`${API_URL}/auth/token`, params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    });
-    
-    const { access_token, role: userRole } = res.data;
+    const { access_token, role: userRole } = await authAPI.login(email, password);
     localStorage.setItem('token', access_token);
     localStorage.setItem('role', userRole);
     
@@ -61,11 +45,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (email, password, userRole = 'student') => {
-    await axios.post(`${API_URL}/auth/register`, {
-      email,
-      password,
-      role: userRole
-    });
+    await authAPI.register(email, password, userRole);
   };
 
   const logout = () => {
@@ -75,7 +55,6 @@ export const AuthProvider = ({ children }) => {
     setRole(null);
     setUser(null);
     setLoading(false);
-    delete axios.defaults.headers.common['Authorization'];
   };
 
   return (
